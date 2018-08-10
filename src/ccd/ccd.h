@@ -96,6 +96,8 @@ CCD_EXPORT void ccdFirstDirDefault(const void *o1, const void *o2,
 CCD_EXPORT int ccdGJKIntersect(const void *obj1, const void *obj2,
                                 const ccd_t *ccd);
 
+CCD_EXPORT int ccdGJKDistance(const void *obj1, const void *obj2, const ccd_t *ccd, ccd_vec3_t *v1, ccd_vec3_t *v2);
+
 /**
  * This function computes separation vector of two objects. Separation
  * vector is minimal translation of obj2 to get obj1 and obj2 speparated

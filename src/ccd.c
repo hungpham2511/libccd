@@ -172,6 +172,78 @@ static int penEPAPos(const ccd_pt_t *pt, const ccd_pt_el_t *nearest,
     return 0;
 }
 
+int ccdGJKDistance(const void *obj1, const void *obj2, const ccd_t *ccd,
+                   ccd_vec3_t *v1, ccd_vec3_t *v2){
+
+  ccd_simplex_t simplex_;
+  ccd_simplex_t* simplex = &simplex_;
+  ccd_vec3_t dir; // direction vector
+  ccd_support_t last; // last support point
+  int do_simplex_res;
+  unsigned long iterations;
+  double w_norm, w_lower_bnd = -1, w_lower_bnd_;
+
+  // initialize simplex struct
+  ccdSimplexInit(simplex);
+
+  // get first direction
+  ccd->first_dir(obj1, obj2, &dir);
+  // get first support point
+  __ccdSupport(obj1, obj2, &dir, ccd, &last);
+  // and add this point to simplex as last one
+  ccdSimplexAdd(simplex, &last);
+
+  // set up direction vector to as (O - last) which is exactly -last
+  ccdVec3Copy(&dir, &last.v);
+  ccdVec3Scale(&dir, -CCD_ONE);
+
+  // start iterations
+  for (iterations = 0UL; iterations < ccd->max_iterations; ++iterations) {
+      // obtain support point
+      __ccdSupport(obj1, obj2, &dir, ccd, &last);
+
+      // check if farthest point in Minkowski difference in direction dir
+      // isn't somewhere before origin (the test on negative dot product)
+      // - because if it is, objects are not intersecting at all.
+      // if (ccdVec3Dot(&last.v, &dir) < CCD_ZERO){
+      //     return -1; // intersection not found
+      //  }
+
+      // add last support vector to simplex
+      ccdSimplexAdd(simplex, &last);
+
+      // if doSimplex returns 1 if objects intersect, -1 if objects don't
+      // intersect and 0 if algorithm should continue
+      do_simplex_res = doSimplex(simplex, &dir);
+      if (do_simplex_res == 1){
+          return 0; // intersection found
+        }else if (do_simplex_res == -1){
+          return -1; // intersection not found
+        }
+
+      if (ccdIsZero(ccdVec3Len2(&dir))){
+          return -1; // intersection not found
+        }
+
+      // check for convergence
+      w_lower_bnd_ = - ccdVec3Dot(&dir, &(last.v)) / CCD_SQRT(ccdVec3Len2(&dir));
+      w_lower_bnd = (w_lower_bnd_ > w_lower_bnd) ? w_lower_bnd_: w_lower_bnd;
+
+      if (w_lower_bnd > CCD_SQRT(ccdVec3Len2(&(last.v))) - ccd->dist_tolerance){
+          v1->v[0] = last.v1.v[0];
+          v1->v[1] = last.v1.v[1];
+          v1->v[2] = last.v1.v[2];
+          v2->v[0] = last.v2.v[0];
+          v2->v[1] = last.v2.v[1];
+          v2->v[2] = last.v2.v[2];
+          return -2;
+        }
+    }
+
+  // intersection wasn't found
+  return -1;
+}
+
 int ccdGJKPenetration(const void *obj1, const void *obj2, const ccd_t *ccd,
                       ccd_real_t *depth, ccd_vec3_t *dir, ccd_vec3_t *pos)
 {
